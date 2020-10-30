@@ -1,11 +1,12 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Created on Wed Dec 20 22:02:09 2017
 
-标普500 的测试实验
+标普500 加上中国隔夜股市的测试实验
 
-@author: dell
+@author: apple
 """
+# %% load data
 import os
 
 import tensorflow as tf
@@ -18,27 +19,21 @@ from TSLibrary import StockPredictionSystem as spSystem
 from TSLibrary import TimeSeriesAnalyzer as tsAnalyzer
 from matplotlib import pyplot as plt
 
-
-result_path = "result/LSTMRegressor_all"
+result_path = "result/LSTMRegressor_all_overnight"
 isExists=os.path.exists(result_path)
 if not isExists:
     os.makedirs(result_path)
-    
-# %% load data
+
 # 标普500 数据较好
 #data_path = '/Users/mayingrui/Desktop/暑研/代码！！！！！/实验代码/data/IndexData/^GSPC.csv'
-#data_path = '../data/^GSPC.csv' 
-data_path = '../data/S&P500_new.csv'
+data_path = '../data/CSI300_new.csv' 
 
-FEATURES = ["Open", "High", "Low", "ClosePrice", "AdjClose", "Volume"]
-
-PRICE = "ClosePrice"
+FEATURES = ["Close", "Open", "High", "Low", "Volume", "Fluctuation"]
+PRICE = "Close"
 LABEL = "Target"
-TIME = 'Ntime'
+TIME = 'Date'
 #load未处理的data,  数据,数量，dimension
 index_set, index_num, features_size = spSystem.load_data(data_path)
-
-
 #%% 循环处理
 test_size = 0.3     # 测试集比例
 list_data = spSystem.slide_windows(index_set, 2226 ,interval=(int)(2226 * test_size) )
@@ -50,9 +45,9 @@ for df in list_data:
     #%% prepare data
     data = df.copy()
     data.index = range(0,len(data))
-    origin_data = data['ClosePrice'].copy()
+    origin_data = data['Close'].copy()
     # 生成目标数据
-    data[LABEL] = spSystem.generate_target_regression(data['ClosePrice'])
+    data[LABEL] = spSystem.generate_target_regression(data['Close'])
     # 裁剪, 重新定义索引
     data = data[1:len(data)-1]
     data.index = range(0,len(data))
@@ -71,12 +66,12 @@ for df in list_data:
     train_data[LABEL], scalers[LABEL] = spSystem.data_processor(train_data[LABEL])
     
     ###########################################################
-    regressor = spModel.SPMLSTMRegressor(FEATURES, LABEL)
+    regressor = spModel.SPMDNNRegressor(FEATURES, LABEL)
     regressor.train_model(train_data, 5000)
     
     test_data = regressor.predict(test_data)
-    res = test_data[['Ntime','Predict','Target']]    
-    
+    res = test_data[['Date','Predict','Target']]
+
     # 缩放后的数据
     res['Predict_scale'] = res['Predict']
     # 数据逆缩放，得到原始数据集
@@ -98,7 +93,7 @@ for df in list_data:
     #图片绘制
     #%% 图形绘制
     fig, ax = plt.subplots(1, 1)
-    fig_path = result_path + "/" + str(res['Ntime'][0])
+    fig_path = result_path + "/" + str(res['Date'][0])
     x = np.arange(len(res['Predict']))
     ax.plot(x, res['Predict'],'k', color='b')
     ax.plot(x, res['Target'],'k',color = 'g')
@@ -107,8 +102,7 @@ for df in list_data:
     fig.show()
     fig.savefig(fig_path)
 
-
-    ###########################################################
+     ###########################################################
     # 保存实验
     adict = dict()
     adict['result'] = res
@@ -120,6 +114,5 @@ for df in list_data:
     experiment.append(adict)
 
 #%% 数据存储
-experiment_path = result_path + "/experiment.txt"
+experiment_path = result_path + "/experiment_overnight.txt"
 spSystem.save_experiment(experiment,experiment_path)
-
